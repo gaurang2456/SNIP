@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/urlshortener?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${SPRING_DATASOURCE_USERNAME:urluser}
+    password: ${SPRING_DATASOURCE_PASSWORD:urlpassword}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+      timeout: 2000ms
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000
+
+server:
+  port: 8080
+
+app:
+  base-url: ${APP_BASE_URL:http://localhost:8080}
+  short-code-length: 6
+  default-expiry-days: 30
+  redis:
+    url-ttl: 3600
+
+management:
+  endpoints:
+    health:
+      show-details: always
+    web:
+      exposure:
+        include: health,info,metrics
