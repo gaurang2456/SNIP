@@ -12,15 +12,10 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
-  data:
-    redis:
-      host: ${SPRING_REDIS_HOST:localhost}
-      port: ${SPRING_REDIS_PORT:6379}
-      timeout: 2000ms
+
   cache:
-    type: redis
-    redis:
-      time-to-live: 3600000
+    type: simple
+
 
 server:
   port: ${PORT:8080}
