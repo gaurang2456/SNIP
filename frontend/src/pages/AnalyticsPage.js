@@ -1,35 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar, Cell
-} from 'recharts';
-import { ArrowLeft, MousePointerClick, TrendingUp, ExternalLink, Copy, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { urlApi } from '../api/urlApi';
-import './AnalyticsPage.css';
-
-const COLORS = ['#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
+import QrCodeModal from '../components/QrCodeModal';
 
 function AnalyticsPage() {
   const { id } = useParams();
-  const [analytics, setAnalytics] = useState(null);
-  const [urlData, setUrlData] = useState(null);
+  const [topUrls, setTopUrls] = useState([]);
+  const [selectedAnalytics, setSelectedAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState(null);
+  const [period, setPeriod] = useState('7D');
+  const [selectedQrItem, setSelectedQrItem] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+      setError(null);
       try {
-        const [analyticsRes, urlRes] = await Promise.all([
-          urlApi.getAnalytics(id),
-          urlApi.getUrlById(id),
-        ]);
-        setAnalytics(analyticsRes.data.data);
-        setUrlData(urlRes.data.data);
-      } catch {
-        toast.error('Failed to load analytics');
+        if (id) {
+          const res = await urlApi.getAnalytics(id);
+          setSelectedAnalytics(res.data?.data || res.data);
+        }
+
+        const topRes = await urlApi.getTopUrls();
+        const topList = topRes.data?.data || topRes.data || [];
+        setTopUrls(Array.isArray(topList) ? topList : []);
+      } catch (err) {
+        console.error('Analytics fetch error:', err);
+        setError('Unable to load analytics data from backend.');
+        setTopUrls([]);
       } finally {
         setLoading(false);
       }
@@ -37,190 +37,216 @@ function AnalyticsPage() {
     fetchData();
   }, [id]);
 
-  const handleCopy = async () => {
-    if (!urlData) return;
-    try {
-      await navigator.clipboard.writeText(urlData.shortUrl);
-      setCopied(true);
-      toast.success('Copied!');
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error('Failed to copy');
-    }
+  const handleCopy = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success('Copied to clipboard!');
+    });
   };
 
-  if (loading) {
-    return (
-      <div className="analytics">
-        <div className="container">
-          <div className="analytics__loading">
-            <div className="skeleton" style={{ height: 24, width: 200, marginBottom: 32 }} />
-            <div className="analytics__skeleton-grid">
-              {[1, 2].map(i => (
-                <div key={i} className="skeleton" style={{ height: 120, borderRadius: 12 }} />
-              ))}
-            </div>
-            <div className="skeleton" style={{ height: 280, borderRadius: 12, marginTop: 24 }} />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const totalClicks = selectedAnalytics
+    ? selectedAnalytics.totalClicks || 0
+    : topUrls.reduce((acc, u) => acc + (u.clickCount || 0), 0);
 
-  if (!analytics) return null;
-
-  const refererEntries = Object.entries(analytics.refererStats || {}).slice(0, 6);
-  const maxReferer = Math.max(...refererEntries.map(([, v]) => v), 1);
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="analytics__tooltip">
-          <p className="analytics__tooltip-label">{label}</p>
-          <p className="analytics__tooltip-value">{payload[0].value} clicks</p>
-        </div>
-      );
-    }
-    return null;
-  };
+  const dailyClicksList = selectedAnalytics?.dailyClicks || [];
+  const hasDailyData = dailyClicksList.length > 0;
 
   return (
-    <div className="analytics">
-      <div className="container">
-        {/* Back */}
-        <Link to="/dashboard" className="analytics__back">
-          <ArrowLeft size={16} />
-          Back to dashboard
-        </Link>
-
-        {/* Header */}
-        <div className="analytics__header">
-          <div className="analytics__header-info">
-            <h1 className="analytics__title">
-              {urlData?.title || analytics.shortCode}
-            </h1>
-            <div className="analytics__urls">
-              <a
-                href={urlData?.shortUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="analytics__short-url"
-              >
-                {urlData?.shortUrl}
-                <ExternalLink size={13} />
-              </a>
-              <span className="analytics__original-url">{analytics.originalUrl}</span>
-            </div>
+    <main className="w-full pt-16 bg-surface min-h-screen">
+      <div className="max-w-[1200px] mx-auto px-lg py-xl">
+        <div className="flex flex-col w-full">
+          {/* Header */}
+          <div className="mb-2xl flex flex-col items-start gap-xs">
+            <h1 className="font-display text-display text-on-surface">Analytics</h1>
+            <p className="font-body-md text-body-md text-on-surface-variant max-w-[600px]">
+              {selectedAnalytics
+                ? `Detailed metrics for link snip/${selectedAnalytics.shortCode}`
+                : 'Track performance and reach across all your shortened URLs.'}
+            </p>
           </div>
-          <button className="analytics__copy-btn" onClick={handleCopy}>
-            {copied ? <Check size={15} /> : <Copy size={15} />}
-            {copied ? 'Copied!' : 'Copy link'}
-          </button>
-        </div>
 
-        {/* Stats */}
-        <div className="analytics__stats">
-          <div className="analytics__stat-card analytics__stat-card--primary">
-            <div className="analytics__stat-icon">
-              <MousePointerClick size={22} />
+          {error && (
+            <div className="mb-lg p-md bg-error-container/30 border border-error-container text-on-error-container rounded-lg text-sm">
+              {error}
             </div>
-            <div>
-              <p className="analytics__stat-label">Total clicks</p>
-              <p className="analytics__stat-value">{analytics.totalClicks?.toLocaleString()}</p>
-            </div>
-          </div>
-          <div className="analytics__stat-card">
-            <div className="analytics__stat-icon analytics__stat-icon--green">
-              <TrendingUp size={22} />
-            </div>
-            <div>
-              <p className="analytics__stat-label">Last 30 days</p>
-              <p className="analytics__stat-value">
-                {analytics.dailyClicks?.reduce((s, d) => s + d.count, 0)?.toLocaleString() || 0}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Daily clicks chart */}
-        <div className="analytics__card">
-          <h2 className="analytics__card-title">Daily clicks (last 30 days)</h2>
-          {analytics.dailyClicks && analytics.dailyClicks.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={analytics.dailyClicks} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="clickGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11, fill: '#94a3b8' }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => {
-                    const d = new Date(v);
-                    return `${d.getMonth() + 1}/${d.getDate()}`;
-                  }}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: '#94a3b8' }}
-                  tickLine={false}
-                  axisLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="count"
-                  stroke="#6366f1"
-                  strokeWidth={2.5}
-                  fill="url(#clickGradient)"
-                  dot={false}
-                  activeDot={{ r: 5, fill: '#6366f1', strokeWidth: 0 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="analytics__empty">No click data yet</div>
           )}
-        </div>
 
-        {/* Referrers */}
-        {refererEntries.length > 0 && (
-          <div className="analytics__card">
-            <h2 className="analytics__card-title">Top referrers</h2>
-            <div className="analytics__referrers">
-              {refererEntries.map(([referer, count], i) => (
-                <div key={referer} className="analytics__referrer-row">
-                  <div className="analytics__referrer-info">
-                    <span
-                      className="analytics__referrer-dot"
-                      style={{ background: COLORS[i % COLORS.length] }}
-                    />
-                    <span className="analytics__referrer-name">
-                      {referer === 'null' || !referer ? 'Direct / Unknown' : referer}
-                    </span>
-                  </div>
-                  <div className="analytics__referrer-bar-wrap">
-                    <div
-                      className="analytics__referrer-bar"
-                      style={{
-                        width: `${(count / maxReferer) * 100}%`,
-                        background: COLORS[i % COLORS.length],
-                      }}
-                    />
-                  </div>
-                  <span className="analytics__referrer-count">{count}</span>
-                </div>
-              ))}
+          {/* Metric Stat Cards */}
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-lg mb-2xl">
+            <div className="bg-surface-container rounded-xl p-lg flex flex-col justify-between items-start h-[160px] relative overflow-hidden group">
+              <div className="absolute -right-12 -top-12 w-40 h-40 bg-surface-container-high rounded-full blur-3xl opacity-50 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+              <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary"></span> Total Clicks
+              </span>
+              <div className="flex flex-col">
+                <span className="font-display text-[64px] leading-none text-on-surface tracking-[-0.05em] mb-sm">
+                  {totalClicks.toLocaleString()}
+                </span>
+                <span className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px] text-on-surface">trending_up</span> Real-time backend total
+                </span>
+              </div>
             </div>
-          </div>
-        )}
+
+            <div className="bg-surface-container rounded-xl p-lg flex flex-col justify-between items-start h-[160px] relative overflow-hidden group">
+              <div className="absolute -right-12 -bottom-12 w-32 h-32 bg-primary/5 rounded-full blur-2xl opacity-50 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+              <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-on-surface-variant"></span> Total Links
+              </span>
+              <div className="flex flex-col">
+                <span className="font-display text-[64px] leading-none text-on-surface tracking-[-0.05em] mb-sm">
+                  {topUrls.length}
+                </span>
+                <span className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px] text-on-surface">link</span> Shortened URLs
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-surface-container rounded-xl p-lg flex flex-col justify-between items-start h-[160px] relative overflow-hidden group">
+              <div className="absolute left-0 top-0 w-full h-full bg-gradient-to-br from-surface-container-highest/50 to-transparent pointer-events-none"></div>
+              <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-on-surface-variant"></span> Active Links
+              </span>
+              <div className="flex flex-col">
+                <span className="font-display text-[64px] leading-none text-on-surface tracking-[-0.05em] mb-sm">
+                  {topUrls.filter((u) => u.isActive !== false && !u.expired).length}
+                </span>
+                <span className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px] text-on-surface">check_circle</span> Active status
+                </span>
+              </div>
+            </div>
+          </section>
+
+          {/* Click Activity Chart */}
+          <section className="bg-surface-container rounded-xl p-xl flex flex-col mb-2xl relative overflow-hidden shadow-sm">
+            <div className="absolute inset-0 bg-gradient-to-b from-surface-container-highest/20 to-transparent pointer-events-none"></div>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-xl relative z-10 gap-md">
+              <div>
+                <h2 className="font-headline-lg text-headline-lg text-on-surface mb-xs">Click Activity</h2>
+                <p className="font-body-md text-body-md text-on-surface-variant">Daily click volume tracked by the backend API.</p>
+              </div>
+              <div className="flex items-center gap-sm bg-surface rounded-full p-1 shadow-sm">
+                {['7D', '30D', 'YTD'].map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPeriod(p)}
+                    className={`px-md py-sm font-label-sm text-label-sm rounded-full transition-colors ${
+                      period === p
+                        ? 'bg-primary text-on-primary font-medium'
+                        : 'text-on-surface hover:bg-surface-variant'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="w-full min-h-[220px] flex items-center justify-center relative z-10">
+              {hasDailyData ? (
+                <svg className="w-full h-[260px] overflow-visible" preserveAspectRatio="none" viewBox="0 0 800 260">
+                  <g className="text-on-surface" stroke="currentColor" strokeDasharray="4 4" strokeOpacity="0.1">
+                    <line x1="0" x2="800" y1="50" y2="50"></line>
+                    <line x1="0" x2="800" y1="125" y2="125"></line>
+                    <line x1="0" x2="800" y1="200" y2="200"></line>
+                  </g>
+                  <path
+                    d="M0,200 L800,200"
+                    fill="none"
+                    stroke="#1b1b1b"
+                    strokeWidth="2"
+                  ></path>
+                </svg>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center gap-xs py-xl text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[36px] text-on-surface-variant/40">show_chart</span>
+                  <h4 className="font-headline-md text-body-md text-on-surface">No click activity recorded yet</h4>
+                  <p className="text-sm max-w-[360px]">
+                    Analytics and daily click trends will automatically display here as soon as your links receive traffic.
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Top Performing URLs Section */}
+          <section className="mb-2xl">
+            <div className="flex justify-between items-end mb-lg">
+              <h3 className="font-headline-md text-headline-md text-on-surface">Top Performing URLs</h3>
+              <Link
+                to="/urls"
+                className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors uppercase tracking-widest flex items-center gap-1"
+              >
+                View All <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              </Link>
+            </div>
+
+            <div className="flex flex-col gap-sm">
+              {loading ? (
+                <div className="p-xl text-center text-on-surface-variant">Loading top URLs...</div>
+              ) : topUrls.length === 0 ? (
+                <div className="p-2xl bg-surface rounded-lg text-center text-on-surface-variant border border-outline-variant/10">
+                  <p className="font-body-md text-on-surface">No links found.</p>
+                  <p className="text-sm mt-xs">Create shortened URLs to view performance stats here.</p>
+                </div>
+              ) : (
+                topUrls.map((item) => {
+                  const shortUrl = item.shortUrl || `${window.location.origin}/${item.shortCode}`;
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-surface rounded-lg p-md flex items-center justify-between group hover:bg-surface-container transition-colors shadow-sm border border-outline-variant/10"
+                    >
+                      <div className="flex items-center gap-md min-w-0">
+                        <div className="w-10 h-10 rounded-md bg-surface-container-highest flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                          <span className="material-symbols-outlined">link</span>
+                        </div>
+                        <div className="min-w-0 flex flex-col">
+                          <a
+                            href={shortUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono-url text-mono-url text-on-surface font-bold truncate hover:underline"
+                          >
+                            {item.shortCode ? `snip/${item.shortCode}` : shortUrl}
+                          </a>
+                          <span className="font-body-md text-[13px] text-on-surface-variant truncate">
+                            {item.originalUrl}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-lg ml-md shrink-0">
+                        <div className="flex flex-col items-end">
+                          <span className="font-headline-md text-[18px] text-on-surface leading-none font-semibold">
+                            {item.clickCount != null ? item.clickCount.toLocaleString() : 0}
+                          </span>
+                          <span className="font-label-sm text-[10px] text-on-surface-variant uppercase">Clicks</span>
+                        </div>
+                        <button
+                          onClick={() => handleCopy(shortUrl)}
+                          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-variant text-on-surface-variant transition-colors"
+                          title="Copy link"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </section>
+        </div>
       </div>
-    </div>
+
+      {/* QR Code Modal */}
+      <QrCodeModal
+        isOpen={Boolean(selectedQrItem)}
+        onClose={() => setSelectedQrItem(null)}
+        urlItem={selectedQrItem}
+      />
+    </main>
   );
 }
 
