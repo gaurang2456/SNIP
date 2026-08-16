@@ -3,10 +3,8 @@ package com.urlshortener.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import lombok.Data;
 import org.hibernate.validator.constraints.URL;
 
-@Data
 public class CreateUrlRequest {
 
     @NotBlank(message = "Original URL is required")
@@ -20,4 +18,45 @@ public class CreateUrlRequest {
     private Integer expiryDays;
 
     private String title;
+
+    public CreateUrlRequest() {}
+
+    public CreateUrlRequest(String originalUrl, String customAlias, Integer expiryDays, String title) {
+        this.originalUrl = originalUrl;
+        this.customAlias = customAlias;
+        this.expiryDays = expiryDays;
+        this.title = title;
+    }
+
+    public String getOriginalUrl() {
+        return originalUrl;
+    }
+
+    public void setOriginalUrl(String originalUrl) {
+        this.originalUrl = originalUrl;
+    }
+
+    public String getCustomAlias() {
+        return customAlias;
+    }
+
+    public void setCustomAlias(String customAlias) {
+        this.customAlias = customAlias;
+    }
+
+    public Integer getExpiryDays() {
+        return expiryDays;
+    }
+
+    public void setExpiryDays(Integer expiryDays) {
+        this.expiryDays = expiryDays;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
 }

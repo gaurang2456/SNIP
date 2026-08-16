@@ -1,17 +1,20 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/urlshortener?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
-    username: ${SPRING_DATASOURCE_USERNAME:urluser}
-    password: ${SPRING_DATASOURCE_PASSWORD:urlpassword}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:urlshortener;DB_CLOSE_DELAY=-1;MODE=MySQL}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.h2.Driver}
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: false
+    database-platform: ${SPRING_JPA_DATABASE_PLATFORM:org.hibernate.dialect.H2Dialect}
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
+  h2:
+    console:
+      enabled: true
 
   data:
     redis:
@@ -21,10 +24,7 @@ spring:
       timeout: 2000ms
 
   cache:
-    type: redis
-    redis:
-      time-to-live: 3600000
-
+    type: ${SPRING_CACHE_TYPE:none}
 
 server:
   port: ${PORT:8080}

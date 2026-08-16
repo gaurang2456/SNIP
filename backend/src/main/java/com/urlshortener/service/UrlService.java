@@ -10,8 +10,9 @@ import com.urlshortener.model.ClickAnalytics;
 import com.urlshortener.model.Url;
 import com.urlshortener.repository.ClickAnalyticsRepository;
 import com.urlshortener.repository.UrlRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -27,13 +28,21 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
-@Slf4j
 public class UrlService {
+
+    private static final Logger log = LoggerFactory.getLogger(UrlService.class);
 
     private final UrlRepository urlRepository;
     private final ClickAnalyticsRepository clickAnalyticsRepository;
     private final RedisTemplate<String, String> redisTemplate;
+
+    public UrlService(UrlRepository urlRepository,
+                      ClickAnalyticsRepository clickAnalyticsRepository,
+                      @Autowired(required = false) RedisTemplate<String, String> redisTemplate) {
+        this.urlRepository = urlRepository;
+        this.clickAnalyticsRepository = clickAnalyticsRepository;
+        this.redisTemplate = redisTemplate;
+    }
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -88,11 +97,16 @@ public class UrlService {
     @Transactional
     public String resolveUrl(String shortCode, String ipAddress, String userAgent, String referer) {
         // Try Redis cache first
-        String cachedUrl = redisTemplate.opsForValue().get(REDIS_URL_PREFIX + shortCode);
-        if (cachedUrl != null) {
-            // Still record analytics asynchronously
-            recordClickAsync(shortCode, ipAddress, userAgent, referer);
-            return cachedUrl;
+        try {
+            if (redisTemplate != null) {
+                String cachedUrl = redisTemplate.opsForValue().get(REDIS_URL_PREFIX + shortCode);
+                if (cachedUrl != null) {
+                    recordClickAsync(shortCode, ipAddress, userAgent, referer);
+                    return cachedUrl;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Redis lookup skipped: {}", e.getMessage());
         }
 
         Url url = urlRepository.findByShortCode(shortCode)
@@ -184,7 +198,13 @@ public class UrlService {
                 .orElseThrow(() -> new UrlNotFoundException("URL not found with id: " + id));
 
         // Remove from Redis
-        redisTemplate.delete(REDIS_URL_PREFIX + url.getShortCode());
+        try {
+            if (redisTemplate != null) {
+                redisTemplate.delete(REDIS_URL_PREFIX + url.getShortCode());
+            }
+        } catch (Exception e) {
+            log.debug("Redis delete skipped: {}", e.getMessage());
+        }
 
         url.setIsActive(false);
         urlRepository.save(url);
@@ -204,7 +224,13 @@ public class UrlService {
         List<Url> expiredUrls = urlRepository.findExpiredUrls(LocalDateTime.now());
         expiredUrls.forEach(url -> {
             url.setIsActive(false);
-            redisTemplate.delete(REDIS_URL_PREFIX + url.getShortCode());
+            try {
+                if (redisTemplate != null) {
+                    redisTemplate.delete(REDIS_URL_PREFIX + url.getShortCode());
+                }
+            } catch (Exception e) {
+                log.debug("Redis delete skipped: {}", e.getMessage());
+            }
         });
         if (!expiredUrls.isEmpty()) {
             urlRepository.saveAll(expiredUrls);
@@ -213,7 +239,13 @@ public class UrlService {
     }
 
     private void cacheUrl(String shortCode, String originalUrl) {
-        redisTemplate.opsForValue().set(REDIS_URL_PREFIX + shortCode, originalUrl, redisTtl, TimeUnit.SECONDS);
+        try {
+            if (redisTemplate != null) {
+                redisTemplate.opsForValue().set(REDIS_URL_PREFIX + shortCode, originalUrl, redisTtl, TimeUnit.SECONDS);
+            }
+        } catch (Exception e) {
+            log.debug("Redis caching skipped: {}", e.getMessage());
+        }
     }
 
     private String generateUniqueShortCode() {

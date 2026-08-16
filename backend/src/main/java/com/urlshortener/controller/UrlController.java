@@ -8,7 +8,6 @@ import com.urlshortener.service.QrCodeService;
 import com.urlshortener.service.UrlService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,12 +18,16 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/urls")
-@RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class UrlController {
 
     private final UrlService urlService;
     private final QrCodeService qrCodeService;
+
+    public UrlController(UrlService urlService, QrCodeService qrCodeService) {
+        this.urlService = urlService;
+        this.qrCodeService = qrCodeService;
+    }
 
     @PostMapping
     public ResponseEntity<ApiResponse<UrlResponse>> createShortUrl(
