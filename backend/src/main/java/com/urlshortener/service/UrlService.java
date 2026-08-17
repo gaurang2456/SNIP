@@ -8,6 +8,7 @@ import com.urlshortener.exception.UrlExpiredException;
 import com.urlshortener.exception.UrlNotFoundException;
 import com.urlshortener.model.ClickAnalytics;
 import com.urlshortener.model.Url;
+import com.urlshortener.model.User;
 import com.urlshortener.repository.ClickAnalyticsRepository;
 import com.urlshortener.repository.UrlRepository;
 import org.slf4j.Logger;
@@ -15,14 +16,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -60,7 +60,7 @@ public class UrlService {
     private static final String CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
     @Transactional
-    public UrlResponse createShortUrl(CreateUrlRequest request) {
+    public UrlResponse createShortUrl(CreateUrlRequest request, User currentUser) {
         // Validate custom alias uniqueness
         if (request.getCustomAlias() != null && !request.getCustomAlias().isBlank()) {
             if (urlRepository.existsByCustomAlias(request.getCustomAlias())) {
@@ -83,6 +83,7 @@ public class UrlService {
                 .customAlias(request.getCustomAlias())
                 .expiresAt(expiresAt)
                 .title(request.getTitle())
+                .user(currentUser) // Null for anonymous, set for authenticated user
                 .build();
 
         url = urlRepository.save(url);
@@ -90,7 +91,8 @@ public class UrlService {
         // Cache in Redis
         cacheUrl(shortCode, request.getOriginalUrl());
 
-        log.info("Created short URL: {} -> {}", shortCode, request.getOriginalUrl());
+        log.info("Created short URL: {} -> {} (User: {})", shortCode, request.getOriginalUrl(),
+                currentUser != null ? currentUser.getEmail() : "anonymous");
         return mapToResponse(url);
     }
 
@@ -147,6 +149,13 @@ public class UrlService {
         clickAnalyticsRepository.save(analytics);
     }
 
+    public List<UrlResponse> getUrlsForUser(Long userId) {
+        return urlRepository.findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     public List<UrlResponse> getAllUrls() {
         return urlRepository.findAllActive()
                 .stream()
@@ -160,9 +169,21 @@ public class UrlService {
         return mapToResponse(url);
     }
 
-    public AnalyticsResponse getAnalytics(Long id) {
+    public UrlResponse getUrlByIdAndUser(Long id, Long userId) {
         Url url = urlRepository.findById(id)
                 .orElseThrow(() -> new UrlNotFoundException("URL not found with id: " + id));
+
+        validateOwnership(url, userId);
+        return mapToResponse(url);
+    }
+
+    public AnalyticsResponse getAnalytics(Long id, Long userId) {
+        Url url = urlRepository.findById(id)
+                .orElseThrow(() -> new UrlNotFoundException("URL not found with id: " + id));
+
+        if (userId != null) {
+            validateOwnership(url, userId);
+        }
 
         LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
         List<Object[]> dailyData = clickAnalyticsRepository.findDailyClicksByUrlId(id, thirtyDaysAgo);
@@ -193,9 +214,13 @@ public class UrlService {
 
     @Transactional
     @CacheEvict(value = "urls", key = "#id")
-    public void deleteUrl(Long id) {
+    public void deleteUrl(Long id, Long userId) {
         Url url = urlRepository.findById(id)
                 .orElseThrow(() -> new UrlNotFoundException("URL not found with id: " + id));
+
+        if (userId != null) {
+            validateOwnership(url, userId);
+        }
 
         // Remove from Redis
         try {
@@ -208,14 +233,23 @@ public class UrlService {
 
         url.setIsActive(false);
         urlRepository.save(url);
-        log.info("Deactivated URL with id: {}", id);
+        log.info("Deactivated URL with id: {} by user: {}", id, userId);
     }
 
-    public List<UrlResponse> getTopUrls() {
-        return urlRepository.findTopUrls()
-                .stream()
+    public List<UrlResponse> getTopUrls(Long userId) {
+        List<Url> urls = (userId != null)
+                ? urlRepository.findTopUrlsByUserId(userId)
+                : urlRepository.findTopUrls();
+
+        return urls.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    private void validateOwnership(Url url, Long userId) {
+        if (url.getUser() == null || !url.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("You do not have permission to access this URL");
+        }
     }
 
     @Scheduled(cron = "0 0 * * * *") // Every hour
@@ -278,6 +312,7 @@ public class UrlService {
                 .isActive(url.getIsActive())
                 .title(url.getTitle())
                 .expired(url.isExpired())
+                .userId(url.getUser() != null ? url.getUser().getId() : null)
                 .build();
     }
 }

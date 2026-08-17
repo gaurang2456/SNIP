@@ -29,9 +29,17 @@ public interface UrlRepository extends JpaRepository<Url, Long> {
     @Query("SELECT u FROM Url u WHERE u.isActive = true ORDER BY u.createdAt DESC")
     List<Url> findAllActive();
 
+    @Query("SELECT u FROM Url u WHERE u.user.id = :userId AND u.isActive = true ORDER BY u.createdAt DESC")
+    List<Url> findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(@Param("userId") Long userId);
+
+    Optional<Url> findByIdAndUserId(Long id, Long userId);
+
     @Query("SELECT u FROM Url u WHERE u.expiresAt < :now AND u.isActive = true")
     List<Url> findExpiredUrls(@Param("now") LocalDateTime now);
 
     @Query("SELECT u FROM Url u ORDER BY u.clickCount DESC LIMIT 10")
     List<Url> findTopUrls();
+
+    @Query("SELECT u FROM Url u WHERE u.user.id = :userId AND u.isActive = true ORDER BY u.clickCount DESC LIMIT 10")
+    List<Url> findTopUrlsByUserId(@Param("userId") Long userId);
 }

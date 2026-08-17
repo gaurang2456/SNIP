@@ -14,12 +14,13 @@ public class UrlResponse {
     private Boolean isActive;
     private String title;
     private boolean expired;
+    private Long userId;
 
     public UrlResponse() {}
 
     public UrlResponse(Long id, String originalUrl, String shortCode, String shortUrl, String customAlias,
                        Long clickCount, LocalDateTime createdAt, LocalDateTime expiresAt, Boolean isActive,
-                       String title, boolean expired) {
+                       String title, boolean expired, Long userId) {
         this.id = id;
         this.originalUrl = originalUrl;
         this.shortCode = shortCode;
@@ -31,6 +32,7 @@ public class UrlResponse {
         this.isActive = isActive;
         this.title = title;
         this.expired = expired;
+        this.userId = userId;
     }
 
     public Long getId() { return id; }
@@ -66,6 +68,9 @@ public class UrlResponse {
     public boolean isExpired() { return expired; }
     public void setExpired(boolean expired) { this.expired = expired; }
 
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
     public static UrlResponseBuilder builder() {
         return new UrlResponseBuilder();
     }
@@ -82,6 +87,7 @@ public class UrlResponse {
         private Boolean isActive;
         private String title;
         private boolean expired;
+        private Long userId;
 
         public UrlResponseBuilder id(Long id) { this.id = id; return this; }
         public UrlResponseBuilder originalUrl(String originalUrl) { this.originalUrl = originalUrl; return this; }
@@ -94,9 +100,10 @@ public class UrlResponse {
         public UrlResponseBuilder isActive(Boolean isActive) { this.isActive = isActive; return this; }
         public UrlResponseBuilder title(String title) { this.title = title; return this; }
         public UrlResponseBuilder expired(boolean expired) { this.expired = expired; return this; }
+        public UrlResponseBuilder userId(Long userId) { this.userId = userId; return this; }
 
         public UrlResponse build() {
-            return new UrlResponse(id, originalUrl, shortCode, shortUrl, customAlias, clickCount, createdAt, expiresAt, isActive, title, expired);
+            return new UrlResponse(id, originalUrl, shortCode, shortUrl, customAlias, clickCount, createdAt, expiresAt, isActive, title, expired, userId);
         }
     }
 }

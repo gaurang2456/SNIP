@@ -36,10 +36,14 @@ public class Url {
     @Column(name = "title", length = 255)
     private String title;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = true)
+    private User user;
+
     public Url() {}
 
     public Url(Long id, String originalUrl, String shortCode, String customAlias, Long clickCount,
-               LocalDateTime createdAt, LocalDateTime expiresAt, Boolean isActive, String title) {
+               LocalDateTime createdAt, LocalDateTime expiresAt, Boolean isActive, String title, User user) {
         this.id = id;
         this.originalUrl = originalUrl;
         this.shortCode = shortCode;
@@ -49,6 +53,7 @@ public class Url {
         this.expiresAt = expiresAt;
         this.isActive = isActive != null ? isActive : true;
         this.title = title;
+        this.user = user;
     }
 
     public Long getId() { return id; }
@@ -77,6 +82,9 @@ public class Url {
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
     @PrePersist
     protected void onCreate() {
@@ -109,6 +117,7 @@ public class Url {
         private LocalDateTime expiresAt;
         private Boolean isActive = true;
         private String title;
+        private User user;
 
         public UrlBuilder id(Long id) { this.id = id; return this; }
         public UrlBuilder originalUrl(String originalUrl) { this.originalUrl = originalUrl; return this; }
@@ -119,9 +128,10 @@ public class Url {
         public UrlBuilder expiresAt(LocalDateTime expiresAt) { this.expiresAt = expiresAt; return this; }
         public UrlBuilder isActive(Boolean isActive) { this.isActive = isActive; return this; }
         public UrlBuilder title(String title) { this.title = title; return this; }
+        public UrlBuilder user(User user) { this.user = user; return this; }
 
         public Url build() {
-            return new Url(id, originalUrl, shortCode, customAlias, clickCount, createdAt, expiresAt, isActive, title);
+            return new Url(id, originalUrl, shortCode, customAlias, clickCount, createdAt, expiresAt, isActive, title, user);
         }
     }
 }
