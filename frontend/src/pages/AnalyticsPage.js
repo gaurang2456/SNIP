@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { urlApi } from '../api/urlApi';
+import { useAuth } from '../context/AuthContext';
 import QrCodeModal from '../components/QrCodeModal';
 
 function AnalyticsPage() {
   const { id } = useParams();
+  const { isAuthenticated, openAuthModal } = useAuth();
   const [topUrls, setTopUrls] = useState([]);
   const [selectedAnalytics, setSelectedAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -14,6 +16,11 @@ function AnalyticsPage() {
   const [selectedQrItem, setSelectedQrItem] = useState(null);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       setLoading(true);
       setError(null);
@@ -28,20 +35,57 @@ function AnalyticsPage() {
         setTopUrls(Array.isArray(topList) ? topList : []);
       } catch (err) {
         console.error('Analytics fetch error:', err);
-        setError('Unable to load analytics data from backend.');
+        const msg = err.response?.data?.message || 'Unable to load analytics data from backend.';
+        setError(msg);
         setTopUrls([]);
       } finally {
         setLoading(false);
       }
     };
+
     fetchData();
-  }, [id]);
+  }, [id, isAuthenticated]);
 
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text).then(() => {
       toast.success('Copied to clipboard!');
     });
   };
+
+  if (!isAuthenticated) {
+    return (
+      <main className="w-full pt-16 bg-surface min-h-screen">
+        <div className="max-w-[1200px] mx-auto px-lg py-2xl flex flex-col items-center justify-center text-center">
+          <div className="w-full max-w-[480px] bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-2xl shadow-md flex flex-col items-center gap-md">
+            <div className="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-xs">
+              <span className="material-symbols-outlined text-[32px]">query_stats</span>
+            </div>
+            <h1 className="font-display text-[26px] text-on-surface font-bold">
+              Your analytics are waiting.
+            </h1>
+            <p className="font-body-md text-on-surface-variant text-sm max-w-[360px] leading-relaxed">
+              Create an account to save your links and track their performance over time.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center gap-md w-full mt-md">
+              <button
+                onClick={() => openAuthModal('login', 'analytics')}
+                className="w-full py-md rounded-xl bg-primary text-on-primary font-headline-md text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm active:scale-[0.99]"
+              >
+                Sign in
+              </button>
+              <button
+                onClick={() => openAuthModal('register', 'analytics')}
+                className="w-full py-md rounded-xl bg-surface border border-outline-variant/30 text-on-surface font-headline-md text-sm font-semibold hover:bg-surface-container transition-all active:scale-[0.99]"
+              >
+                Create account
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   const totalClicks = selectedAnalytics
     ? selectedAnalytics.totalClicks || 0

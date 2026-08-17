@@ -1,35 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import ShortenForm from '../components/ShortenForm';
 import QrCodeModal from '../components/QrCodeModal';
 import { urlApi } from '../api/urlApi';
+import { useAuth } from '../context/AuthContext';
 
 function HomePage() {
+  const { isAuthenticated } = useAuth();
   const [urls, setUrls] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [selectedQrItem, setSelectedQrItem] = useState(null);
   const [visibleCount, setVisibleCount] = useState(5);
 
-  const fetchUrls = async () => {
+  const fetchUrls = useCallback(async () => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      setError(null);
       const res = await urlApi.getAllUrls();
       const list = res.data?.data || res.data || [];
       setUrls(Array.isArray(list) ? list : []);
     } catch (err) {
       console.error('Failed to fetch URLs:', err);
-      setError('Unable to load links. Make sure backend server is running.');
-      setUrls([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchUrls();
-  }, []);
+  }, [fetchUrls]);
 
   const handleCreated = (newUrl) => {
     setUrls((prev) => [newUrl, ...prev]);
@@ -73,15 +76,17 @@ function HomePage() {
           <section className="flex flex-col gap-lg w-full">
             <div className="flex items-center justify-between pb-sm border-b border-outline-variant/30">
               <h2 className="font-headline-md text-headline-md text-on-surface">Your recent links</h2>
-              <div className="flex items-center gap-sm">
-                <button
-                  onClick={fetchUrls}
-                  className="text-on-surface-variant hover:text-on-surface transition-colors p-sm rounded-full hover:bg-surface-container flex items-center justify-center"
-                  title="Refresh list"
-                >
-                  <span className="material-symbols-outlined text-[20px]">refresh</span>
-                </button>
-              </div>
+              {isAuthenticated && (
+                <div className="flex items-center gap-sm">
+                  <button
+                    onClick={fetchUrls}
+                    className="text-on-surface-variant hover:text-on-surface transition-colors p-sm rounded-full hover:bg-surface-container flex items-center justify-center"
+                    title="Refresh list"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">refresh</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col w-full" id="url-list">
@@ -89,11 +94,6 @@ function HomePage() {
                 <div className="py-xl text-center text-on-surface-variant font-body-md">
                   <span className="material-symbols-outlined animate-spin text-[24px] mb-xs">progress_activity</span>
                   <p>Loading your links...</p>
-                </div>
-              ) : error ? (
-                <div className="py-xl text-center text-error font-body-md">
-                  <p>{error}</p>
-                  <button onClick={fetchUrls} className="mt-sm text-xs underline text-primary">Try again</button>
                 </div>
               ) : urls.length === 0 ? (
                 <div className="py-2xl text-center flex flex-col items-center justify-center gap-xs">
@@ -111,7 +111,7 @@ function HomePage() {
                   const isActive = item.isActive !== false && !item.expired;
                   return (
                     <div
-                      key={item.id}
+                      key={item.id || item.shortCode}
                       className={`group flex items-center justify-between py-md border-b border-outline-variant/20 hover:bg-surface-container-lowest transition-colors px-md -mx-md rounded-lg ${
                         !isActive ? 'opacity-60' : ''
                       }`}
@@ -161,13 +161,15 @@ function HomePage() {
                         >
                           <span className="material-symbols-outlined text-[20px]">qr_code_2</span>
                         </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="p-sm text-on-surface-variant hover:text-error hover:bg-error-container/30 rounded-full transition-colors flex items-center justify-center"
-                          title="Delete"
-                        >
-                          <span className="material-symbols-outlined text-[20px]">delete</span>
-                        </button>
+                        {isAuthenticated && item.id && (
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="p-sm text-on-surface-variant hover:text-error hover:bg-error-container/30 rounded-full transition-colors flex items-center justify-center"
+                            title="Delete"
+                          >
+                            <span className="material-symbols-outlined text-[20px]">delete</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

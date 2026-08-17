@@ -1,14 +1,25 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, logout, openAuthModal } = useAuth();
 
   const navItems = [
-    { path: '/', label: 'Home' },
-    { path: '/urls', label: 'URLs' },
-    { path: '/analytics', label: 'Analytics' },
+    { path: '/', label: 'Home', requiresAuth: false },
+    { path: '/urls', label: 'URLs', requiresAuth: true, context: 'urls' },
+    { path: '/analytics', label: 'Analytics', requiresAuth: true, context: 'analytics' },
   ];
+
+  const handleNavClick = (e, item) => {
+    if (item.requiresAuth && !isAuthenticated) {
+      e.preventDefault();
+      openAuthModal('prompt', item.context);
+      navigate(item.path);
+    }
+  };
 
   return (
     <header className="fixed top-0 w-full z-50 bg-white border-b border-outline-variant/30">
@@ -19,11 +30,14 @@ function Navbar() {
         </Link>
         <nav className="flex items-center gap-xl h-full">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path || (item.path === '/urls' && location.pathname === '/dashboard');
+            const isActive =
+              location.pathname === item.path ||
+              (item.path === '/urls' && location.pathname === '/dashboard');
             return (
               <Link
                 key={item.path}
                 to={item.path}
+                onClick={(e) => handleNavClick(e, item)}
                 className={`h-full flex items-center transition-all ${
                   isActive
                     ? 'text-primary font-bold border-b-2 border-primary'
@@ -36,9 +50,29 @@ function Navbar() {
           })}
         </nav>
         <div className="flex items-center gap-md">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-sm cursor-pointer" title="Account">
-            <span className="material-symbols-outlined text-on-primary text-[18px]">person</span>
-          </div>
+          {isAuthenticated ? (
+            <div className="flex items-center gap-md">
+              <span className="font-body-md text-xs font-medium text-on-surface-variant max-w-[180px] truncate hidden sm:inline-block bg-surface-container px-md py-xs rounded-full border border-outline-variant/20">
+                {user?.email}
+              </span>
+              <button
+                onClick={logout}
+                className="text-xs font-label-sm uppercase tracking-wider text-on-surface-variant hover:text-error transition-colors px-sm py-xs rounded hover:bg-error-container/20 flex items-center gap-xs font-semibold"
+                title="Sign out"
+              >
+                <span className="material-symbols-outlined text-[16px]">logout</span>
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => openAuthModal('login')}
+              className="px-lg py-xs h-9 rounded-lg bg-primary text-on-primary font-headline-md text-xs font-semibold hover:bg-primary/90 transition-all shadow-xs flex items-center gap-xs active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-[16px]">login</span>
+              Sign in
+            </button>
+          )}
         </div>
       </div>
     </header>

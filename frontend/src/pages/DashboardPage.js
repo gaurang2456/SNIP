@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { urlApi } from '../api/urlApi';
+import { useAuth } from '../context/AuthContext';
 import ShortenForm from '../components/ShortenForm';
 import QrCodeModal from '../components/QrCodeModal';
 
 function DashboardPage() {
   const navigate = useNavigate();
+  const { isAuthenticated, openAuthModal } = useAuth();
   const [urls, setUrls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -17,6 +19,10 @@ function DashboardPage() {
   const pageSize = 5;
 
   const fetchUrls = useCallback(async () => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -29,7 +35,7 @@ function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchUrls();
@@ -51,6 +57,39 @@ function DashboardPage() {
       toast.success('Copied to clipboard!');
     });
   };
+
+  if (!isAuthenticated) {
+    return (
+      <main className="w-full pt-16 bg-surface min-h-screen">
+        <div className="max-w-[1200px] mx-auto px-lg py-2xl flex flex-col items-center justify-center text-center">
+          <div className="w-full max-w-[480px] bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-2xl shadow-md flex flex-col items-center gap-md">
+            <div className="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-xs">
+              <span className="material-symbols-outlined text-[32px]">bookmark</span>
+            </div>
+            <h1 className="font-display text-[26px] text-on-surface font-bold">Track your links</h1>
+            <p className="font-body-md text-on-surface-variant text-sm max-w-[360px] leading-relaxed">
+              Sign in to save your links and view click analytics across your URLs.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center gap-md w-full mt-md">
+              <button
+                onClick={() => openAuthModal('login', 'urls')}
+                className="w-full py-md rounded-xl bg-primary text-on-primary font-headline-md text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm active:scale-[0.99]"
+              >
+                Sign in
+              </button>
+              <button
+                onClick={() => openAuthModal('register', 'urls')}
+                className="w-full py-md rounded-xl bg-surface border border-outline-variant/30 text-on-surface font-headline-md text-sm font-semibold hover:bg-surface-container transition-all active:scale-[0.99]"
+              >
+                Create account
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   const filtered = urls.filter((u) => {
     if (!search.trim()) return true;
@@ -182,11 +221,11 @@ function DashboardPage() {
                   ) : paginatedUrls.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-lg py-2xl text-center text-on-surface-variant">
-                        <div className="flex flex-col items-center justify-center gap-xs">
-                          <span className="material-symbols-outlined text-[32px] text-on-surface-variant/40">link_off</span>
-                          <p className="font-headline-md text-body-md text-on-surface">No URLs found</p>
-                          <p className="text-sm">
-                            {search ? 'No links match your search query.' : 'Create your first shortened URL using the "New Link" button above.'}
+                        <div className="flex flex-col items-center justify-center gap-xs py-lg">
+                          <span className="material-symbols-outlined text-[36px] text-on-surface-variant/40">link_off</span>
+                          <p className="font-headline-md text-headline-md text-on-surface font-semibold">No links yet.</p>
+                          <p className="text-sm text-on-surface-variant">
+                            {search ? 'No links match your search query.' : 'Shorten your first URL to get started.'}
                           </p>
                         </div>
                       </td>
@@ -241,7 +280,7 @@ function DashboardPage() {
                                 <span className="material-symbols-outlined text-[18px]">qr_code_2</span>
                               </button>
                               <button
-                                onClick={() => navigate(`/analytics`)}
+                                onClick={() => navigate(`/analytics/${item.id}`)}
                                 className="p-xs hover:bg-surface-container rounded text-on-surface-variant hover:text-primary transition-colors"
                                 title="View Analytics"
                               >
