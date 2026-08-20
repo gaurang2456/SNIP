@@ -18,6 +18,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('snip_token');
+      localStorage.removeItem('snip_user');
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const urlApi = {
   createUrl: (data) => api.post('/urls', data),
   getAllUrls: () => api.get('/urls'),
