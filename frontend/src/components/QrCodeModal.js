@@ -1,9 +1,10 @@
 import React from 'react';
+import { urlApi } from '../api/urlApi';
 
 function QrCodeModal({ isOpen, onClose, urlItem }) {
   if (!isOpen || !urlItem) return null;
 
-  const qrImageUrl = `/api/urls/${urlItem.id}/qr`;
+  const qrImageUrl = urlApi.getQrCodeUrl(urlItem.id);
   const displayUrl = urlItem.shortUrl || `${window.location.origin}/${urlItem.shortCode}`;
 
   const handleDownload = () => {

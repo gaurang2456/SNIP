@@ -20,7 +20,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/urls")
-@CrossOrigin(origins = "*")
 public class UrlController {
 
     private final UrlService urlService;

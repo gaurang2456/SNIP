@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 
 @RestController
-@CrossOrigin(origins = "*")
 public class RedirectController {
 
     private final UrlService urlService;
